@@ -26,7 +26,9 @@ export default function ChatInterface({ activeEmployee, onInspectPolicy, onInspe
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [latestDecision, setLatestDecision] = useState(null);
-  const [conversationId] = useState(() => `conv-${Date.now()}`);
+  const [conversationId, setConversationId] = useState(
+    () => `conv-${Date.now()}`
+  );
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -113,7 +115,7 @@ export default function ChatInterface({ activeEmployee, onInspectPolicy, onInspe
             <h2>IT Support Assistant</h2>
             <p>Active Session with {activeEmployee?.name} ({activeEmployee?.department} • {activeEmployee?.employmentType})</p>
           </div>
-          <button 
+          <button
             style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', color: '#94a3b8' }}
             onClick={() => {
               setMessages([
@@ -125,6 +127,7 @@ export default function ChatInterface({ activeEmployee, onInspectPolicy, onInspe
                 }
               ]);
               setLatestDecision(null);
+              setConversationId(`conv-${Date.now()}`);
             }}
           >
             <RefreshCw size={14} />
@@ -224,10 +227,10 @@ export default function ChatInterface({ activeEmployee, onInspectPolicy, onInspe
 
       {/* Right: Real-time Decision & Grounding Side Panel */}
       <div className="side-panel">
-        <DecisionCard 
-          decision={latestDecision} 
-          onInspectPolicy={onInspectPolicy} 
-          onInspectTicket={onInspectTicket} 
+        <DecisionCard
+          decision={latestDecision}
+          onInspectPolicy={onInspectPolicy}
+          onInspectTicket={onInspectTicket}
         />
 
         {/* Quick Test Catalog */}
