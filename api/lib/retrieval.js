@@ -66,8 +66,8 @@ export function searchPolicies(query) {
 
     // Special domain couplings:
     // Laptop queries should surface both KB-03 (3-year / hardware failure) and POL-ASSET-01 (4-year refresh / finance sign-off)
-    if ((qLower.includes('laptop') || qLower.includes('computer')) && 
-        (policy.id === 'KB-03' || policy.id === 'POL-ASSET-01')) {
+    if ((qLower.includes('laptop') || qLower.includes('computer')) &&
+      (policy.id === 'KB-03' || policy.id === 'POL-ASSET-01')) {
       score += 6;
     }
 
@@ -145,7 +145,7 @@ export function getEmployeeContext(employeeIdOrName) {
     return employees[0]; // Default fallback to Aditi Sharma
   }
   const needle = employeeIdOrName.toLowerCase().trim();
-  const emp = employees.find(e => 
+  const emp = employees.find(e =>
     e.id.toLowerCase() === needle ||
     e.name.toLowerCase() === needle ||
     e.email.toLowerCase() === needle ||
@@ -165,18 +165,28 @@ export function getEmployeeContext(employeeIdOrName) {
  */
 export function retrieveContext(message, employeeId, runtimeTickets = [], conversationHistory = []) {
   const employee = getEmployeeContext(employeeId);
-  
+  const employeeRequest = requests.find(
+    r => r.employeeId === employee.id
+  );
+
   // Combine recent conversation turns with current message for effective context retrieval
-  const contextQuery = conversationHistory && conversationHistory.length > 0
-    ? `${conversationHistory.slice(-2).map(c => c.content).join(' ')} ${message}`
-    : message;
+  const priorUserText = conversationHistory && conversationHistory.length > 0
+    ? conversationHistory
+      .filter(turn => turn.role === 'user')
+      .slice(-3)
+      .map(turn => turn.content)
+      .join(' ')
+    : '';
+
+  const contextQuery = `${priorUserText} ${message}`.trim();
 
   const matchedPolicies = searchPolicies(contextQuery);
   const matchedTickets = searchTickets(contextQuery, runtimeTickets);
 
   return {
     employee,
-    policies: matchedPolicies.slice(0, 3), // Top 3 most relevant policies
+    request: employeeRequest || null,
+    policies: matchedPolicies.slice(0, 3),
     tickets: matchedTickets,
     hasExactPolicy: matchedPolicies.length > 0
   };

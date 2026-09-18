@@ -8,11 +8,14 @@
 
 export function validateDecision(rawDecision, { message, context, conversationHistory = [] }) {
   const validated = { ...rawDecision };
-  
+
   // Combine current message with previous turn if context is needed for pronouns/follow-ups
-  const priorText = conversationHistory.length > 0 
-    ? conversationHistory.slice(-2).map(c => c.content).join(' ') 
-    : '';
+  const priorText = conversationHistory
+    .filter(turn => turn.role === 'user')
+    .slice(-3)
+    .map(turn => turn.content)
+    .join(' ');
+
   const text = `${priorText} ${message}`.toLowerCase();
   const employee = context.employee || {};
 
@@ -42,9 +45,9 @@ export function validateDecision(rawDecision, { message, context, conversationHi
   // =========================================================================
   // RULE 1: Vague / Low-information Request (e.g., REQ-15: "its not working")
   // =========================================================================
-  const isExtremelyVague = text.length <= 60 && 
+  const isExtremelyVague = text.length <= 60 &&
     (text.includes('not working') || text.includes('help') || text.includes('broken')) &&
-    !text.includes('vpn') && !text.includes('laptop') && !text.includes('printer') && 
+    !text.includes('vpn') && !text.includes('laptop') && !text.includes('printer') &&
     !text.includes('password') && !text.includes('screen') && !text.includes('wifi') &&
     !text.includes('expense') && !text.includes('mail');
 
@@ -76,9 +79,8 @@ export function validateDecision(rawDecision, { message, context, conversationHi
   if (text.includes('phishing') || text.includes('malware') || text.includes('suspicious email') || text.includes('unauthorized access')) {
     validated.decision = 'ESCALATE';
     validated.intent = 'Suspected Security Incident / Phishing Report';
-    if (!validated.sourcePolicies.includes('KB-09')) {
-      validated.sourcePolicies.push('KB-09');
-    }
+    validated.sourcePolicies = ['KB-09'];
+    validated.sourceTickets = [];
     validated.action = {
       type: 'ESCALATE_SECURITY',
       parameters: {
@@ -87,12 +89,12 @@ export function validateDecision(rawDecision, { message, context, conversationHi
         isSimulated: true
       }
     };
-    
+
     const warningForwarding = text.includes('forward') || text.includes('teammate') || text.includes('team');
-    
+
     validated.decisionEvidence = [
       'KB-09 mandates that all suspected phishing, malware, or unauthorized access attempts must be reported to security@veridian-corp.example immediately.',
-      warningForwarding 
+      warningForwarding
         ? 'CRITICAL SAFETY ALERT: KB-09 strictly prohibits forwarding suspected phishing emails to other employees under any circumstances.'
         : 'KB-09 prohibits forwarding suspected security threats.'
     ];
@@ -134,7 +136,7 @@ export function validateDecision(rawDecision, { message, context, conversationHi
   // =========================================================================
   if (text.includes('password') || text.includes('locked out') || text.includes('failed attempt')) {
     validated.sourcePolicies = ['KB-01'];
-    
+
     // Check if lockout is >= 5 attempts
     const attemptsMatch = text.match(/(\d+)\s*(?:times|attempts|failed)/);
     const attemptCount = attemptsMatch ? parseInt(attemptsMatch[1], 10) : 0;
@@ -165,7 +167,7 @@ export function validateDecision(rawDecision, { message, context, conversationHi
         parameters: { portal: 'Veridian Self-Service Portal', isSimulated: false }
       };
       validated.decisionEvidence = [
-        'Employee requested password reset assistance with fewer than 5 failed attempts.',
+        'Employee requested password reset assistance and did not report an account lockout or failed-attempt threshold.', ,
         'KB-01 allows employees to reset their own password via the self-service portal at any time.',
         'No IT manual intervention required.'
       ];
@@ -403,7 +405,28 @@ export function validateDecision(rawDecision, { message, context, conversationHi
 
     if (isHardwareDead || isOld3Years) {
       validated.decision = 'ESCALATE';
-      validated.intent = 'Laptop Replacement (Hardware Failure & Age Qualification)';
+      const laptopEvidence = [];
+
+      if (isHardwareDead) {
+        laptopEvidence.push('Employee reported that the laptop is not turning on or is completely dead.');
+      }
+
+      if (isOld3Years) {
+        const ageMatch = text.match(/(\d+(?:\.\d+)?)\s*years?/);
+        if (ageMatch) {
+          laptopEvidence.push(`Employee reported that the laptop is ${ageMatch[1]} years old.`);
+        }
+      }
+
+      laptopEvidence.push(
+        'KB-03 provides that laptops are eligible for replacement after 3 years or earlier upon verified hardware failure.'
+      );
+
+      laptopEvidence.push(
+        'Asset Management Policy specifies a standard 4-year refresh cycle; early replacement outside the cycle requires Finance sign-off in addition to IT approval.'
+      );
+
+      validated.decisionEvidence = laptopEvidence;
       validated.action = {
         type: 'CREATE_TICKET',
         parameters: { targetTeam: 'IT Hardware & Finance', requiresFinanceSignOff: true, isSimulated: true }

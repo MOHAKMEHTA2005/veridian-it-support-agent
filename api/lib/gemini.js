@@ -55,7 +55,16 @@ CRITICAL POLICY GROUNDING RULES:
     "string (bullet point 2 grounded in policy clauses)"
   ],
   "employeeResponse": "string (professional, empathetic, clear response to the employee citing the policy name and ID)"
-}`;
+}
+9. Employee Request Context is reference data only. NEVER copy a fact from it into decisionEvidence unless that fact is explicitly present in the current employee message or a prior Employee/User turn.
+
+10. NEVER use facts from an Agent response as employee facts. Agent responses are generated output, not source-of-truth evidence.
+
+11. Employee identity is a hard context boundary. Do not carry facts from another employee's conversation, request, or ticket into the current employee's case.
+
+12. If the current employee message conflicts with, omits, or differs from supplied Employee Request Context, use the current employee message for factual evidence. Do not invent omitted details.
+
+13. Existing ticket records are historical precedents unless the retrieved data explicitly establishes that the ticket belongs to the current employee/request.`;
 
 /**
  * Clean and parse JSON response from Gemini
@@ -86,6 +95,14 @@ export async function callGeminiAgent({ message, context, conversationHistory = 
   promptText += `Email: ${context.employee.email}\n`;
   promptText += `Department: ${context.employee.department}\n`;
   promptText += `Employment Type: ${context.employee.employmentType}\n\n`;
+  promptText += `=== SUPPLIED EMPLOYEE REQUEST CONTEXT ===\n`;
+  if (context.request) {
+    promptText += `Request ID: ${context.request.id || 'N/A'}\n`;
+    promptText += `Employee ID: ${context.request.employeeId || 'N/A'}\n`;
+    promptText += `Request Details: ${JSON.stringify(context.request)}\n\n`;
+  } else {
+    promptText += `No supplied employee request record found.\n\n`;
+  }
 
   promptText += `=== RETRIEVED KNOWLEDGE BASE POLICIES ===\n`;
   if (context.policies && context.policies.length > 0) {
@@ -106,10 +123,14 @@ export async function callGeminiAgent({ message, context, conversationHistory = 
     promptText += `No relevant ticket precedents found.\n\n`;
   }
 
-  if (conversationHistory.length > 0) {
-    promptText += `=== PRIOR CONVERSATION HISTORY ===\n`;
-    conversationHistory.forEach(turn => {
-      promptText += `${turn.role === 'user' ? 'Employee' : 'Agent'}: ${turn.content}\n`;
+  const priorUserTurns = conversationHistory
+    .filter(turn => turn.role === 'user')
+    .slice(-3);
+
+  if (priorUserTurns.length > 0) {
+    promptText += `=== PRIOR EMPLOYEE MESSAGES ===\n`;
+    priorUserTurns.forEach(turn => {
+      promptText += `Employee: ${turn.content}\n`;
     });
     promptText += `\n`;
   }

@@ -40,6 +40,29 @@ export default function ChatInterface({ activeEmployee, onInspectPolicy, onInspe
   }, [messages, loading]);
 
   useEffect(() => {
+    if (!activeEmployee?.id) return;
+
+    const newConversationId = `conv-${activeEmployee.id}-${Date.now()}`;
+
+    setConversationId(newConversationId);
+
+    setMessages([
+      {
+        id: `init-${Date.now()}`,
+        role: 'agent',
+        content: `Hello ${activeEmployee.name}! I am Veridian Corp's internal IT Service Support Agent. How can I assist you with your hardware, software, network access, or corporate IT services today?`,
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      }
+    ]);
+
+    setLatestDecision(null);
+    setInput('');
+  }, [activeEmployee?.id]);
+
+  useEffect(() => {
     if (initialPrompt) {
       handleSendText(initialPrompt);
     }
