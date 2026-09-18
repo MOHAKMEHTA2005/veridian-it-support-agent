@@ -55,7 +55,7 @@ export default async function handler(req, res) {
         sourceTickets: context.tickets.map(t => t.ticketId),
         reason: 'Processed via deterministic policy guidelines.',
         decisionEvidence: context.policies.map(p => `Matched against ${p.id}: ${p.title}`),
-        employeeResponse: context.hasExactPolicy 
+        employeeResponse: context.hasExactPolicy
           ? `Regarding your inquiry, per Veridian Policy ${context.policies[0].id} (${context.policies[0].title}): ${context.policies[0].content}`
           : `Thank you for contacting Veridian IT Support. Could you please provide more details so we can assist you?`
       };
@@ -71,7 +71,8 @@ export default async function handler(req, res) {
 
     // 6. Controlled Action Execution & Ticketing
     let createdTicket = null;
-    const shouldCreateTicket = 
+    let reusedExistingTicket = false;
+    const shouldCreateTicket =
       validatedDecision.decision === 'ESCALATE' ||
       validatedDecision.decision === 'ROUTE' ||
       (validatedDecision.action && (
@@ -80,16 +81,32 @@ export default async function handler(req, res) {
         validatedDecision.action.type === 'ESCALATE_SECURITY' ||
         validatedDecision.action.type === 'ROUTE_TEAM'
       ));
+    const activeTickets = runtimeTickets.filter(ticket =>
+      ticket.employeeId === context.employee.id &&
+      ticket.status?.toLowerCase().includes('active')
+    );
+
+    const hasExistingRelevantTicket = activeTickets.some(ticket => {
+      const ticketText = `${ticket.issue || ''} ${ticket.notes || ''}`.toLowerCase();
+
+      return (
+        (validatedDecision.sourcePolicies || []).some(policyId =>
+          ticketText.includes(policyId.toLowerCase())
+        ) ||
+        ticketText.includes('password') && cleanMessage.toLowerCase().includes('account') ||
+        ticketText.includes('unlock') && cleanMessage.toLowerCase().includes('access')
+      );
+    });
 
     // Notice: KB-07 explicitly states "No IT ticket required" for Guest Wi-Fi
     if (validatedDecision.sourcePolicies.includes('KB-07')) {
       // strictly do not create a ticket for guest Wi-Fi
-    } else if (shouldCreateTicket) {
-      const assignedTeam = validatedDecision.action?.parameters?.targetTeam || 
+    } else if (shouldCreateTicket && !hasExistingRelevantTicket) {
+      const assignedTeam = validatedDecision.action?.parameters?.targetTeam ||
         (validatedDecision.decision === 'ESCALATE' ? 'IT Security / Senior IT' : 'IT Service Desk');
-      
-      const ticketStatus = validatedDecision.decision === 'ESCALATE' 
-        ? 'Escalated - Under Review (active)' 
+
+      const ticketStatus = validatedDecision.decision === 'ESCALATE'
+        ? 'Escalated - Under Review (active)'
         : (validatedDecision.decision === 'ROUTE' ? `Routed to ${assignedTeam} (active)` : 'Pending Fulfillment (active)');
 
       createdTicket = store.createTicket({
@@ -102,6 +119,20 @@ export default async function handler(req, res) {
         sourceTickets: validatedDecision.sourceTickets,
         notes: validatedDecision.reason
       });
+    }
+    // Reuse an existing relevant active ticket instead of creating a duplicate
+    if (!createdTicket && hasExistingRelevantTicket) {
+      createdTicket = activeTickets.find(ticket => {
+        const ticketText = `${ticket.issue || ''} ${ticket.notes || ''}`.toLowerCase();
+
+        return (
+          (validatedDecision.sourcePolicies || []).some(policyId =>
+            ticketText.includes(policyId.toLowerCase())
+          ) ||
+          (ticketText.includes('password') && cleanMessage.toLowerCase().includes('account')) ||
+          (ticketText.includes('unlock') && cleanMessage.toLowerCase().includes('access'))
+        );
+      }) || null;
     }
 
     // 7. Append-oriented Audit Logging
@@ -116,7 +147,11 @@ export default async function handler(req, res) {
       sourceTickets: validatedDecision.sourceTickets,
       reason: validatedDecision.reason,
       decisionEvidence: validatedDecision.decisionEvidence,
-      resultingStatus: createdTicket ? `TICKET_CREATED (${createdTicket.ticketId})` : 'RESOLVED_OR_CLARIFIED',
+      resultingStatus: createdTicket
+        ? (reusedExistingTicket
+          ? `EXISTING_TICKET_REUSED (${createdTicket.ticketId})`
+          : `TICKET_CREATED (${createdTicket.ticketId})`)
+        : 'RESOLVED_OR_CLARIFIED',
       actor: 'AI_AGENT',
       ticketId: createdTicket ? createdTicket.ticketId : null
     });
