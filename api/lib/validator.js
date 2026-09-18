@@ -352,7 +352,14 @@ export function validateDecision(rawDecision, { message, context, conversationHi
   // Remote >3 days/wk eligible for allowance (chair, monitor). Requires manager sign-off + Finance processing.
   // IT only handles equipment shipping once approved.
   // =========================================================================
-  if (text.includes('working from home') || text.includes('wfh') || text.includes('home office') || (text.includes('remote') && text.includes('monitor'))) {
+  if (
+    text.includes('working from home') ||
+    text.includes('work from home') ||
+    text.includes('wfh') ||
+    text.includes('home office') ||
+    text.includes('home-office') ||
+    (text.includes('remote') && text.includes('monitor'))
+  ) {
     validated.sourcePolicies = ['KB-10'];
     validated.sourceTickets = [];
     if (!validated.sourcePolicies.includes('KB-10')) validated.sourcePolicies.push('KB-10');
