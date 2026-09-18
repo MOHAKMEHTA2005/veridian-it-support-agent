@@ -1,11 +1,11 @@
 import React from 'react';
 import { Bot, MessageSquare, Ticket, FileText, BookOpen, Users, LogIn, UserCheck } from 'lucide-react';
 
-export default function Navbar({ 
-  currentTab, 
-  setCurrentTab, 
-  employees = [], 
-  activeEmployee, 
+export default function Navbar({
+  currentTab,
+  setCurrentTab,
+  employees = [],
+  activeEmployee,
   setActiveEmployee,
   onOpenAuth,
   authUser
@@ -67,15 +67,34 @@ export default function Navbar({
       <div className="nav-user">
         <div className="user-selector" title="Switch active employee profile">
           <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Employee:</span>
-          <select 
-            value={activeEmployee?.id || ''} 
+          <select
+            value={activeEmployee?.id || ''}
             onChange={(e) => {
               const selected = employees.find(emp => emp.id === e.target.value);
               if (selected) setActiveEmployee(selected);
             }}
+            style={{
+              backgroundColor: '#0f172a',
+              color: '#e2e8f0',
+              border: '1px solid #334155',
+              borderRadius: '6px',
+              padding: '6px 32px 6px 10px',
+              fontSize: '13px',
+              fontWeight: 500,
+              colorScheme: 'dark',
+              cursor: 'pointer',
+              outline: 'none'
+            }}
           >
             {employees.map(emp => (
-              <option key={emp.id} value={emp.id}>
+              <option
+                key={emp.id}
+                value={emp.id}
+                style={{
+                  backgroundColor: '#0f172a',
+                  color: '#e2e8f0'
+                }}
+              >
                 {emp.name} ({emp.department})
               </option>
             ))}
