@@ -353,6 +353,8 @@ export function validateDecision(rawDecision, { message, context, conversationHi
   // IT only handles equipment shipping once approved.
   // =========================================================================
   if (text.includes('working from home') || text.includes('wfh') || text.includes('home office') || (text.includes('remote') && text.includes('monitor'))) {
+    validated.sourcePolicies = ['KB-10'];
+    validated.sourceTickets = [];
     if (!validated.sourcePolicies.includes('KB-10')) validated.sourcePolicies.push('KB-10');
     validated.decision = 'ROUTE';
     validated.intent = 'Home Office Equipment Allowance Request';
